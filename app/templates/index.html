@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FastAPI + Vue.js Example</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+</head>
+<body>
+    <div id="app">
+        <h1>データ一覧</h1>
+        <ul>
+            <li v-for="item in data" :key="item.id">
+                [[ item.name ]] ([[ item.gender ]], [[ item.birthdate ]], [[ item.address ]])
+                <button @click="editItem(item)">編集</button>
+                <button @click="deleteItem(item.id)">削除</button>
+            </li>
+        </ul>
+
+        <h2>データ [[ editingItem ? '編集' : '追加' ]]</h2>
+        <form @submit.prevent="submitForm">
+            <input type="hidden" v-model="form.id">
+            名前: <input type="text" v-model="form.name"><br>
+            住所: <input type="text" v-model="form.address"><br>
+            性別: <input type="text" v-model="form.gender"><br>
+            生年月日: <input type="text" v-model="form.birthdate"><br>
+            <button type="submit">[[ editingItem ? '更新' : '追加' ]]</button>
+            <button v-if="editingItem" type="button" @click="cancelEdit">キャンセル</button>
+        </form>
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            delimiters: ['[[', ']]'],
+            data() {
+                return {
+                    data: JSON.parse('{{ data | safe }}'),
+                    form: { id: null, name: '', address: '', gender: '', birthdate: '' },
+                    editingItem: null
+                }
+            },
+            methods: {
+                editItem(item) {
+                    this.editingItem = item;
+                    this.form = { ...item }; // オブジェクトのコピー
+                },
+                cancelEdit() {
+                    this.editingItem = null;
+                    this.form = { id: null, name: '', address: '', gender: '', birthdate: '' };
+                },                
+                async submitForm() {
+                    try {
+                        const formData = new FormData();
+                        for (const key in this.form) {
+                            formData.append(key, this.form[key]);
+                        }
+                        const url = this.editingItem ? '/update' : '/add';
+                        const method = this.editingItem ? 'POST' : 'POST';
+
+                        const response = await fetch(url, {
+                            method: method,
+                            body: formData
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`Error: ${response.status}`);
+                        }
+
+                        const result = await response.json();
+                        this.data = result.data;
+                        this.cancelEdit();
+                    } catch (error) {
+                        console.error("Error submitting form:", error);
+                        alert("データの処理に失敗しました。");
+                    }
+                },
+                async deleteItem(id) {
+                    try {
+                        const response = await fetch(`/delete/${id}`, { method: 'DELETE' });
+                        if (!response.ok) {
+                            throw new Error(`Error: ${response.status}`);
+                        }
+                        const result = await response.json();
+                        this.data = result.data;
+                    } catch (error) {
+                        console.error("Error deleting item:", error);
+                        alert("データの削除に失敗しました。");
+                    }
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>
